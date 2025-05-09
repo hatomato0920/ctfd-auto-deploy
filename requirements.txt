@@ -1,0 +1,5 @@
+ctfd-deployment/ctfd-deployment/requirements.txt
+
+ctfcli
+requests
+PyYAML

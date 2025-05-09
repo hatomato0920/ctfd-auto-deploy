@@ -1,0 +1,346 @@
+name: Lint Challenge Files
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'challenges/**/*.yml'
+      - 'challenges/**/*.yaml'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Lint challenge files
+        run: |
+          # チャレンジファイルの検証を行うスクリプト
+          cat > lint_challenges.py << 'EOF'
+          import os
+          import sys
+          import glob
+          import yaml
+          import re
+          from pathlib import Path
+
+          # 必須フィールド
+          REQUIRED_FIELDS = ['name', 'author', 'category', 'description', 'value', 'flags']
+          
+          # フィールドの型チェック用マッピング
+          FIELD_TYPES = {
+              'name': str,
+              'author': str,
+              'category': str,
+              'description': str,
+              'value': int,
+              'flags': list,
+              'tags': list,
+              'files': list,
+              'hints': list,
+          }
+          
+          # フラグの必須フィールド
+          FLAG_REQUIRED_FIELDS = ['content', 'type']
+          
+          # 有効なフラグタイプ
+          VALID_FLAG_TYPES = ['static', 'regex']
+          
+          def lint_challenge_file(file_path):
+              """チャレンジファイルの検証を行う"""
+              print(f"\n== Linting {file_path} ==")
+              
+              errors = []
+              warnings = []
+              
+              try:
+                  with open(file_path, 'r', encoding='utf-8') as f:
+                      content = f.read()
+                      
+                      # YAML構文チェック
+                      try:
+                          data = yaml.safe_load(content)
+                          if data is None:
+                              errors.append("YAMLファイルが空です")
+                              return False, errors, warnings
+                      except yaml.YAMLError as e:
+                          errors.append(f"YAML構文エラー: {str(e)}")
+                          return False, errors, warnings
+                      
+                      # 必須フィールドのチェック
+                      for field in REQUIRED_FIELDS:
+                          if field not in data:
+                              errors.append(f"必須フィールド '{field}' がありません")
+                      
+                      # 型チェック
+                      for field, expected_type in FIELD_TYPES.items():
+                          if field in data and data[field] is not None:
+                              actual_value = data[field]
+                              if not isinstance(actual_value, expected_type):
+                                  errors.append(f"フィールド '{field}' の型が正しくありません。期待: {expected_type.__name__}, 実際: {type(actual_value).__name__}")
+                      
+                      # 値の範囲チェック
+                      if 'value' in data:
+                          try:
+                              value = int(data['value'])
+                              if value <= 0:
+                                  errors.append(f"'value'フィールドは正の整数である必要があります: {value}")
+                          except (ValueError, TypeError):
+                              errors.append(f"'value'フィールドを整数に変換できません: {data['value']}")
+                      
+                      # フラグのチェック
+                      if 'flags' in data and isinstance(data['flags'], list):
+                          if len(data['flags']) == 0:
+                              errors.append("'flags'フィールドが空です")
+                          
+                          for i, flag in enumerate(data['flags']):
+                              if not isinstance(flag, dict):
+                                  errors.append(f"フラグ #{i+1} は辞書型である必要があります")
+                                  continue
+                              
+                              # フラグの必須フィールドチェック
+                              for field in FLAG_REQUIRED_FIELDS:
+                                  if field not in flag:
+                                      errors.append(f"フラグ #{i+1} に必須フィールド '{field}' がありません")
+                              
+                              # フラグタイプのチェック
+                              if 'type' in flag and flag['type'] not in VALID_FLAG_TYPES:
+                                  errors.append(f"フラグ #{i+1} に無効なタイプ '{flag['type']}' が指定されています。有効値: {', '.join(VALID_FLAG_TYPES)}")
+                              
+                              # case_sensitive がブール値であることを確認
+                              if 'case_sensitive' in flag and not isinstance(flag['case_sensitive'], bool):
+                                  errors.append(f"フラグ #{i+1} の 'case_sensitive' はブール値である必要があります")
+                      
+                      # ファイル参照のチェック
+                      if 'files' in data and isinstance(data['files'], list):
+                          directory = os.path.dirname(file_path)
+                          for file_ref in data['files']:
+                              file_path = os.path.join(directory, file_ref)
+                              if not os.path.exists(file_path):
+                                  warnings.append(f"参照ファイル '{file_ref}' が存在しません")
+                      
+                      # 説明文が短すぎないかチェック
+                      if 'description' in data:
+                          desc = str(data['description'])
+                          if len(desc) < 10:
+                              warnings.append(f"説明文が短すぎます ({len(desc)} 文字)。もっと詳細な説明を推奨します")
+                      
+                      # チャレンジ名が適切か確認
+                      if 'name' in data:
+                          name = str(data['name'])
+                          if len(name) < 3:
+                              warnings.append(f"チャレンジ名が短すぎます: '{name}'")
+                          
+                          if re.search(r'[<>&;]', name):
+                              errors.append(f"チャレンジ名に無効な文字が含まれています: '{name}'")
+                      
+                      # 結果を返す
+                      success = len(errors) == 0
+                      return success, errors, warnings
+                      
+              except Exception as e:
+                  errors.append(f"処理中にエラーが発生しました: {str(e)}")
+                  return False, errors, warnings
+          
+          def get_changed_files():
+              """GitHub Actionsで変更されたファイルを取得"""
+              if 'GITHUB_EVENT_PATH' in os.environ:
+                  import json
+                  with open(os.environ['GITHUB_EVENT_PATH'], 'r') as f:
+                      event = json.load(f)
+                  
+                  # Pull Requestの変更ファイルを取得
+                  if 'pull_request' in event:
+                      changed_files = []
+                      
+                      # GitHub CLIがインストールされている場合
+                      import subprocess
+                      pr_number = event['pull_request']['number']
+                      try:
+                          result = subprocess.run(
+                              ['git', 'diff', '--name-only', f'origin/main...HEAD'],
+                              capture_output=True, text=True
+                          )
+                          if result.returncode == 0:
+                              for file in result.stdout.splitlines():
+                                  if file.startswith('challenges/') and (file.endswith('.yml') or file.endswith('.yaml')):
+                                      if os.path.basename(file) in ['challenge.yml', 'challenge.yaml']:
+                                          changed_files.append(file)
+                              return changed_files
+                      except Exception as e:
+                          print(f"変更ファイル取得中のエラー: {e}")
+              
+              # 変更ファイルを取得できなかった場合は、全ファイルをチェック
+              yml_files = glob.glob("challenges/**/challenge.yml", recursive=True)
+              yaml_files = glob.glob("challenges/**/challenge.yaml", recursive=True)
+              return yml_files + yaml_files
+          
+          def main():
+              """変更されたチャレンジファイルまたは全てのチャレンジファイルを検証"""
+              print("チャレンジファイルの検証を開始します...")
+              
+              # 変更されたファイルを取得
+              changed_files = get_changed_files()
+              
+              if not changed_files:
+                  print("検証対象のチャレンジファイルが見つかりませんでした")
+                  return 0
+              
+              print(f"検証対象ファイル数: {len(changed_files)}")
+              for file in changed_files:
+                  print(f"  - {file}")
+              print("")
+              
+              all_success = True
+              total_errors = 0
+              total_warnings = 0
+              
+              # 各ファイルを検証
+              for file_path in changed_files:
+                  success, errors, warnings = lint_challenge_file(file_path)
+                  
+                  if not success:
+                      all_success = False
+                  
+                  total_errors += len(errors)
+                  total_warnings += len(warnings)
+                  
+                  # エラーと警告を表示
+                  for error in errors:
+                      print(f"❌ エラー: {error}")
+                  
+                  for warning in warnings:
+                      print(f"⚠️ 警告: {warning}")
+                  
+                  # 結果サマリを表示
+                  if success and not warnings:
+                      print(f"✅ {file_path} は問題ありません")
+                  elif success:
+                      print(f"⚠️ {file_path} は警告 {len(warnings)} 件あります")
+                  else:
+                      print(f"❌ {file_path} はエラー {len(errors)} 件、警告 {len(warnings)} 件あります")
+              
+              # 全体の結果サマリ
+              print("\n=== チャレンジファイル検証結果サマリ ===")
+              print(f"検証したファイル数: {len(changed_files)}")
+              print(f"エラー合計: {total_errors}")
+              print(f"警告合計: {total_warnings}")
+              
+              if all_success and total_warnings == 0:
+                  print("✅ すべてのファイルは問題ありません")
+              elif all_success:
+                  print("⚠️ 警告はありますが、すべてのファイルが基本的な検証を通過しました")
+              else:
+                  print("❌ 一部のファイルにエラーがあります。修正が必要です")
+                  return 1
+              
+              return 0
+          
+          if __name__ == "__main__":
+              sys.exit(main())
+          EOF
+          
+          # スクリプトを実行
+          python lint_challenges.py
+
+      - name: Verify file structure
+        run: |
+          # チャレンジのディレクトリ構造を検証するスクリプト
+          cat > verify_structure.py << 'EOF'
+          import os
+          import sys
+          import fnmatch
+          import re
+          
+          def verify_directory_structure():
+              """チャレンジのディレクトリ構造を検証"""
+              print("\n=== チャレンジディレクトリ構造の検証 ===\n")
+              
+              errors = []
+              warnings = []
+              
+              # 全チャレンジディレクトリを取得
+              challenge_dirs = []
+              for root, dirs, files in os.walk('challenges'):
+                  for file in files:
+                      if file in ['challenge.yml', 'challenge.yaml']:
+                          challenge_dirs.append(root)
+              
+              if not challenge_dirs:
+                  print("チャレンジディレクトリが見つかりませんでした")
+                  return False, [], []
+              
+              # ディレクトリ名の重複チェック
+              base_names = [os.path.basename(d) for d in challenge_dirs]
+              duplicates = set([name for name in base_names if base_names.count(name) > 1])
+              if duplicates:
+                  for dup in duplicates:
+                      errors.append(f"重複するディレクトリ名が検出されました: {dup}")
+              
+              # 各チャレンジディレクトリを検証
+              for directory in challenge_dirs:
+                  # チャレンジファイルを取得
+                  challenge_file = None
+                  if os.path.exists(os.path.join(directory, 'challenge.yml')):
+                      challenge_file = os.path.join(directory, 'challenge.yml')
+                  elif os.path.exists(os.path.join(directory, 'challenge.yaml')):
+                      challenge_file = os.path.join(directory, 'challenge.yaml')
+                  
+                  if not challenge_file:
+                      errors.append(f"ディレクトリ {directory} にchallenge.ymlまたはchallenge.yamlがありません")
+                      continue
+                  
+                  # filesディレクトリが必要な場合に存在するか確認
+                  with open(challenge_file, 'r') as f:
+                      import yaml
+                      try:
+                          data = yaml.safe_load(f)
+                          if data and 'files' in data and data['files']:
+                              # ファイル参照がある場合はfilesディレクトリが必要
+                              files_dir = os.path.join(directory, 'files')
+                              if not os.path.isdir(files_dir):
+                                  errors.append(f"{challenge_file} でファイル参照がありますが、{files_dir} ディレクトリがありません")
+                              else:
+                                  # 参照されているファイルが実際に存在するか確認
+                                  for file_ref in data['files']:
+                                      file_path = os.path.join(directory, file_ref)
+                                      if not os.path.exists(file_path):
+                                          errors.append(f"{challenge_file} で参照されているファイル {file_ref} が存在しません")
+                      except yaml.YAMLError:
+                          errors.append(f"{challenge_file} はYAML形式として解析できません")
+              
+              # 結果表示
+              if errors:
+                  print("エラー:")
+                  for error in errors:
+                      print(f"❌ {error}")
+              
+              if warnings:
+                  print("警告:")
+                  for warning in warnings:
+                      print(f"⚠️ {warning}")
+              
+              if not errors and not warnings:
+                  print("✅ ディレクトリ構造に問題はありません")
+                  return True, errors, warnings
+              else:
+                  return len(errors) == 0, errors, warnings
+          
+          if __name__ == "__main__":
+              success, _, _ = verify_directory_structure()
+              sys.exit(0 if success else 1)
+          EOF
+          
+          python verify_structure.py

@@ -1,0 +1,65 @@
+
+
+
+
+# これはコピー用なので編集しないで！
+# コピーして、問題ディレクトリに入れてから編集して！
+
+
+
+
+
+
+
+
+# これが問題の題名になります。
+# 問題の題名はここを参照します。ディレクトリ名は参照しないので注意。
+name: Challenge_name
+
+# 問題の説明文です。
+# 説明にはフラグフォーマットと、Author名を必ず書いてください。
+# フラグフォーマットは基本的に `flag{}` です。
+description:
+  "
+  ここはどこだろう？
+
+  フラグフォーマット: flag{xxx}
+
+  Author: test_user
+  "
+
+# 下の  `auther:`  は形式的に必要だから入れているだけで、特に意味はないです。
+# Autherは  `description:`  に書いてください。
+author: Your Name
+
+# 点数は半角数字のみ
+# 0点は無効です。
+value: 100
+
+# カテゴリーはディレクトリと同じ名前にしてください。
+# カテゴリ名はここを参照します。ディレクトリ名は参照しないので注意。
+category: OSINT
+
+# タグは複数つけられます。なくてもいいです。
+# 例: `- Authorization`, `- SQL Injection`, `- XSS`, `- Space`, `- buffer overflow`
+tags:
+  - OSINT
+
+# フラグフォーマットは基本的に `flag{}` です。
+# staticかregexのどちらかがいらない場合は消してください。
+# OSINTは基本的にregex必須です。 `test` の部分を書き換えてください。
+# regexの `content:` の意味は `flag{}` はなくてもいいという意味です。
+flags:
+  - type: static
+    content: flag{test}
+    case_sensitive: false
+  - type: regex
+    content: ^(flag\{)?test(\})?$
+    case_sensitive: false
+
+# 添付するファイルがある場合は、  `files:`  にファイル名を記載してください。
+# このときファイル名から答えがわからないようにしてください。
+# 例: `- files/Yokohama.jpg` --このように、ファイル名でヒントを与えることもできる。
+# 添付するファイルがない場合は  `問題名/files`  をディレクトリごと削除し、このファイルの  `files:`  の記述も全て消してください。
+files:
+  - files/example.png
