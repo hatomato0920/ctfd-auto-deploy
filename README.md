@@ -1,71 +1,107 @@
 # ctfd-auto-deploy
 
-## プロジェクト構造
+## 📦 プロジェクト構造
 ```
-ctfd-deployment
+ctfd-auto-deploy
 ├── .github
 │   └── workflows
-│       └── deploy_challenges.yml    # デプロイメント用のGitHub Actionsワークフロー
+│       ├── deploy_challenges.yml    # GitHub Actionsワークフロー
+│       └── lint_challeges.yml       # 問題形式チェック
 ├── challenges
 │   ├── category1
 │   │   └── challenge1
-│   │       ├── challenge.yml        # チャレンジ1の設定
-│   │       └── files
-│   │           └── example.png      # チャレンジ1用の画像ファイル
+│   │       ├── challenge.yml        # 問題設定ファイル
+│   │       └── files/
+│   │           └── example.png      # 添付ファイル
 │   └── category2
-│       ├── challenge2
-│       │   ├── challenge.yml        # チャレンジ2の設定
-│       │   └── files
-│       │       └── example.bin      # チャレンジ2用のバイナリファイル
-│       └── challenge3
-│           └── challenge.yml        # チャレンジ3の設定
-│                                    # filesはなくても大丈夫
-│
-├── config.ini                       # デプロイメントの設定
-├── requirements.txt                 # プロジェクトのPython依存関係
-├── pull_request_template.md         # プルリクの際
-└── README.md                        # プロジェクトのドキュメント
+│       ├── challenge2/
+│       └── challenge3/
+│           └── challenge.yml
+|
+├── requirements.txt                 # Python依存関係
+├── pull_request_template.md         # PRテンプレート
+└── README.md
 ```
 
-## 管理者が最初のみやること
+---
 
-GitHub actionsのシークレットにCTFdのURLとアクセストークンを追加します。
-1. まずCTFdにAdminアカウントでログイン
-2. プロフィール/アクセストークンからアクセストークンを作成
-3. それを`https://github.com/username/repo-name/settings/secrets/actions`に登録
+## 🔐 管理者が最初にやること（1回だけ）
 
-この命名ミスると動かないので注意
-- CTFD_ACCESS_TOKEN 
+### GitHub Secrets の登録
+
+1. 管理用CTFdに **Adminアカウント** でログイン  
+2. プロフィール → アクセストークン を発行  
+3. GitHub の Secrets に以下を登録  
+   → `https://github.com/ユーザー名/リポジトリ名/settings/secrets/actions`
+
+| Secret名            | 説明 |
+|--------------------|------|
+| `CTFD_URL`         | CTFdのURL（例: `https://ctf.example.com`） |
+| `CTFD_ACCESS_TOKEN`| Admin APIトークン（例: `ctfd_abc123...`） |
+
+> ⚠️ **名前のスペルミスに注意！** → 正しくないとCIが失敗します。
+
+---
+
+## 🚀 始め方（利用者向け）
+
+### 1. リポジトリをフォークする
+
+> このリポジトリは**自分の問題を追加・管理する前提**です。Forkしてから使いましょう。
+
+1. GitHub右上の「Fork」ボタンをクリック  
+2. 自分のアカウントにコピーされたらクローンします：
+
 ```
-ctfd_xxxxxxxxx~
-```
-- CTFD_URL
-```
-http://hoge.example.com
+git clone https://github.com/あなたのユーザー名/ctfd-auto-deploy.git
+cd ctfd-auto-deploy
 ```
 
-## 始め方
-このプロジェクトを始めるには、以下の手順に従ってください：
+3. GitHub Secrets に以下を登録（管理者手順参照）  
+   - `CTFD_URL`  
+   - `CTFD_ACCESS_TOKEN`
 
-1. リポジトリのクローン: 以下のコマンドを使用してこのリポジトリをローカルマシンにクローンします：
-```
-git clone https://github.com/hatomato0920/ctfd-auto-deploy.git
-```
+---
 
-2. チャレンジの準備
-   1. challengesディレクトリの中からカテゴリを選びます。(ない場合は作成します。)
-      - 例: `challenges/OSINT`
-   2. カテゴリディレクトリの中に問題のディレクトリを追加します。
-      - 例: `challenges/OSINT/Fastest_Car`
-   3. 問題ディレクトリにカテゴリディレクトリの`challenge.yml`(OSINT/challenge.ymlなど)を追加します。
-   4. 添付するファイルがある場合は問題ディレクトリの中にfilesディレクトリを作成し、`challenge.yml`の`files:`にパスを追加します。
-      - 例: `Fastest_Car/files/Car.png`
+### 2. チャレンジを追加する
 
-3. チャレンジのデプロイ: デプロイメントスクリプトを実行して、チャレンジをCTFdプラットフォームにアップロードします。
+1. `challenges/` の中からカテゴリを選ぶ（なければ作成）  
+   例: `challenges/OSINT`
 
-## challenge.ymlについて
+2. カテゴリディレクトリ内に問題用ディレクトリを作成  
+   例: `challenges/OSINT/Fastest_Car`
 
-- `challenge.yml`は`.yaml`でも動くようにしているとは思いますが保証はできません！
-   - カテゴリにおいてある`challenge.yml`をコピーすることを想定しているので不具合はあまり起こらないとは思います。
-- `challenge/**/*.y*ml`の場所以外の`.y*ml`は検出しません。カテゴリにコピー用の`challenge.yml`を置くことで簡単に問題の`challenge.yml`を追加できます。
-   - testディレクトリをそのままコピーして編集してもOK
+3. `challenge.yml` を追加  
+   例: `challenges/OSINT/Fastest_Car/challenge.yml`  
+   → カテゴリ直下のテンプレ `challenge.yml` をコピーすると楽です
+
+4. 添付ファイルがある場合は `files/` を作って、`challenge.yml` の `files:` にパスを指定  
+   例: `Fastest_Car/files/Car.png`
+
+---
+
+### 3. デプロイする
+
+- GitHub Actions が push/pull request をトリガーに自動で CTFd にアップロードします
+
+---
+
+## 📝 `challenge.yml` について
+
+- `.yml` も `.yaml` も動くとは思いますが、`.yml`を推奨（動作保証外の挙動が起こる可能性あり）  
+- `challenges/**/challenge.yml` の階層以外は無視されるので、正しい構造に注意  
+- カテゴリ直下にテンプレとして `challenge.yml` を置いておくと問題作成が楽になる  
+- 例：`challenges/OSINT/challenge.yml` → `challenges/OSINT/Fastest_Car/` にコピーして編集  
+
+---
+
+## ✅ 補足・ヒント
+
+- テスト用のチャレンジテンプレートを `test/` などに作っておくと、問題作成者がコピペしやすい  
+- `ctfcli` の詳細は [ctfcli公式ドキュメント](https://docs.ctfd.io/docs/deployment/ctfcli) を参照してください  
+
+---
+
+## 🤝 コントリビュート歓迎！
+
+バグ報告・機能提案・プルリクなんでも歓迎です！
