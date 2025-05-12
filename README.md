@@ -45,19 +45,32 @@ ctfd-auto-deploy
 
 ## 🚀 始め方（利用者向け）
 
-### 1. リポジトリをフォークする
+### 1. 新しいリポジトリを作る
 
-> このリポジトリは**自分の問題を追加・管理する前提**です。Forkしてから使いましょう。
+> このテンプレートは**自分のCTFチャレンジを管理・デプロイするためのテンプレート**です。Forkせずに、自分で新しいリポジトリを作成して使ってください。
 
-1. GitHub右上の「Fork」ボタンをクリック  
-2. 自分のアカウントにコピーされたらクローンします：
+1. GitHubで空のパブリック／プライベートリポジトリを作成します（例：`my-ctf-challenges`）
+
+2. このページ上部の「Code」→「Download ZIP」でテンプレートをダウンロードします
+
+3. ダウンロードしたZIPを解凍し、先ほど作ったリポジトリをクローンした作業フォルダに中身をコピーします：
 
 ```
-git clone https://github.com/あなたのユーザー名/ctfd-auto-deploy.git
-cd ctfd-auto-deploy
+git clone https://github.com/あなたのユーザー名/my-ctf-challenges.git
+cd my-ctf-challenges
+
+# zipで解凍した中身をここに上書きで配置（.git/は上書きしない）
 ```
 
-3. GitHub Secrets に以下を登録（管理者手順参照）  
+4. 変更をコミットして初回Pushします：
+
+```
+git add .
+git commit -m "add ctfd-auto-deploy"
+git push origin main
+```
+
+5. GitHub Secrets に以下を登録（管理者手順参照）  
    - `CTFD_URL`  
    - `CTFD_ACCESS_TOKEN`
 
